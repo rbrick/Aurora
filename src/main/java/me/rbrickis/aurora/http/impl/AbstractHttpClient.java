@@ -21,12 +21,15 @@ public class AbstractHttpClient implements HttpClient {
     private RequestType type;
     private Map<String, String> requestProperties;
     private byte[] body;
+    private HttpParameters parameters;
+    private String contentType;
 
-    public AbstractHttpClient(URL url, RequestType type, Map<String, String> requestProperties, byte[] body) {
+    public AbstractHttpClient(URL url, RequestType type, Map<String, String> requestProperties, HttpParameters parameters, byte[] body) {
         this.url = url;
         this.type = type;
         this.requestProperties = requestProperties;
         this.body = body;
+        this.parameters = parameters;
     }
 
     private FutureTask<HttpResponse> call() {
@@ -37,13 +40,16 @@ public class AbstractHttpClient implements HttpClient {
             requestProperties.forEach(connection::addRequestProperty);
 
             if (connection.getDoOutput()) {
-                // write to the body
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                baos.write(body);
+                // write to the body
+                if (contentType.equalsIgnoreCase("application/x-www-form-urlencoded")) {
+                     baos.write(parameters.toString().getBytes());
+                } else {
+                    baos.write(body);
+                }
                 baos.writeTo(connection.getOutputStream());
                 connection.getOutputStream().flush();
             }
-
             return new HttpResponseBuilder()
                     .withHeaders(connection.getHeaderFields())
                     .withInputStream(connection.getInputStream())
@@ -52,6 +58,9 @@ public class AbstractHttpClient implements HttpClient {
         return new FutureTask<>(caller);
     }
 
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
 
     public HttpResponse execute() {
         return execute((result) -> {
